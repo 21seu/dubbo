@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:dubbo="http://dubbo.apache.org/schema/dubbo" xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+       http://dubbo.apache.org/schema/dubbo
+       http://dubbo.apache.org/schema/dubbo/dubbo.xsd
+       http://www.springframework.org/schema/context
+       https://www.springframework.org/schema/context/spring-context.xsd">
+
+    <!--包扫描-->
+    <context:component-scan base-package="com.ftj.service.impl"/>
+
+    <!-- 消费方应用名，用于计算依赖关系，不是匹配条件，不要与提供方一样 -->
+    <dubbo:application name="oder-service-consumer"/>
+
+    <!-- 使用multicast广播注册中心暴露发现服务地址 -->
+    <dubbo:registry address="zookeeper://127.0.0.1:2181"/>
+
+    <!-- 生成远程服务代理，可以和本地bean一样使用demoService check="false"-->
+    <!--方法级优先级最高 精确优先，消费者设置优先（级别一样的情况下）-->
+    <dubbo:reference interface="com.ftj.service.UserService" id="userService">
+        <dubbo:method name="getUserAddressList"></dubbo:method>
+    </dubbo:reference>
+
+    <dubbo:monitor protocol="registry"/>
+    <!--<dubbo:monitor address="127.0.0.1:7001"/>-->
+
+    <!--配置当前消费者的统一规则：所有的服务都不检查-->
+    <!--<dubbo:consumer timeout="3000" check="false"></dubbo:consumer>-->
+
+    <!--注册中心检查-->
+    <!--<dubbo:registry check="false"/>-->
+
+</beans>
