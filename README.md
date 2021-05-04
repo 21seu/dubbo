@@ -245,7 +245,7 @@ clientPort=2181  zookeeper的端口号
 
 1、gmall-interface公共模块：公共接口层（bean、service）
 
-```java
+```
 package com.ftj.bean;
 
 import java.io.Serializable;
@@ -359,7 +359,7 @@ public interface UserService {
 
 2、创建服务提供者user-service-provider模块，对用户接口的实现；且首先需要在 `pom.xml` 引入gmall-interface模块。
 
-```java
+```
 <dependency>
   <groupId>com.ftj.gmall</groupId>
   <artifactId>gmall-interface</artifactId>
@@ -379,7 +379,7 @@ public class UserServiceImpl implements UserService {
 
 3、创建服务消费者order-service-consumer模块，同样首先需要在 `pom.xml` 引入gmall-interface模块。
 
-```java
+```
 <dependency>
   <groupId>com.ftj.gmall</groupId>
   <artifactId>gmall-interface</artifactId>
@@ -403,7 +403,7 @@ public class OrderService {
 
 4、使用dubbo改造上述两个模块，首先引入dubbo和zookeeper相关的依赖。
 
-```xml
+```
         <!-- 引入dubbo -->
         <dependency>
             <groupId>com.alibaba</groupId>
@@ -432,7 +432,7 @@ public class OrderService {
 
 5、配置服务提供方`provider.xml`
 
-```xml
+```
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -463,7 +463,7 @@ public class OrderService {
 
 6、配置服务消费者的`consumer.xml`
 
-```xml
+```
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -499,7 +499,7 @@ public class OrderService {
 
 7、分别启动服务提供方和服务消费者
 
-```java
+```
 public class MainApplication {
     //服务提供者
     public static void main(String[] args) throws IOException {
@@ -532,3 +532,137 @@ public class MainApplication {
 
 
 ## 5、监控中心
+
+
+
+### 5.1 安装监控中心
+
+
+
+1、首先需要[下载](https://github.com/apache/incubator-dubbo-ops)监控中心
+
+2、解压之后就可使用，修改配置指定监控中心地址
+
+![image.png](https://cdn.nlark.com/yuque/0/2021/png/12759906/1620117545173-3a446d4f-5d93-4458-8d1f-86f3ecd58d68.png)
+
+3、启动监控中心（必须先启动zookeeper）
+
+![image.png](https://cdn.nlark.com/yuque/0/2021/png/12759906/1620117617270-12d98a6e-0014-4435-9513-2efc7bc95661.png)
+
+![image.png](https://cdn.nlark.com/yuque/0/2021/png/12759906/1620117691649-f99e5e08-55d7-47cb-881c-715c53d39d40.png)
+
+
+
+### 5.2 监控中心配置
+
+在需要监控服务中配置连接监控中心，进行监控统计。
+
+```
+<!-- 监控中心协议，如果为protocol="registry"，
+表示从注册中心发现监控中心地址，否则直连监控中心 -->
+<dubbo:monitor protocol="registry"></dubbo:monitor>
+```
+
+Simple Monitor 挂掉不会影响到 Consumer 和 Provider 之间的调用，所以用于生产环境不会有风险。
+
+Simple Monitor 采用磁盘存储统计信息，请注意安装机器的磁盘限制，如果要集群，建议用mount共享磁盘。
+
+
+
+## 6、整合springboot
+
+
+
+1. 引入spring-boot-starter以及dubbo和curator依赖。
+
+```
+<dependency>
+  <groupId>com.alibaba.boot</groupId>
+  <artifactId>dubbo-spring-boot-starter</artifactId>
+  <version>0.2.0</version>
+</dependency>
+```
+
+1. 分别配置好服务提供者和服务消费者两个模块的`application.properties`。
+
+```
+dubbo.application.name=user-service-provider
+#指定注册中心的位置
+dubbo.registry.address=127.0.0.1:2181
+dubbo.registry.protocol=zookeeper
+#指定通信规则（协议+端口）
+dubbo.protocol.name=dubbo
+dubbo.protocol.port=20881
+#监控中心ym
+dubbo.monitor.protocol=registry
+
+server.port=8044
+dubbo.application.name=order-service-consumer
+dubbo.registry.address=zookeeper://localhost:2181
+#监控中心协议，自己找
+dubbo.monitor.protocol=registry
+
+server.port=8045
+```
+
+1. 使用dobbo注解，进行测试。
+
+​    注意：
+
+- - @Service注解：服务提供方，在需要提供服务的接口实现类上注解，给到注册中心
+  - @Reference注解：服务消费方，使用这个注解实现远程调用
+  - @@EnableDubbo注解：如果`application.properties`配置文件中没有配置自动扫描注解`dubbo.scan.base-package`，那么可以使用这个注解自动扫描被dubbo注解的类或接口。
+
+```
+@com.alibaba.dubbo.config.annotation.Service //暴露服务
+@Component
+public class UserServiceImpl implements UserService {
+
+    @Override
+    public List<UserAddress> getUserAddressList(String userId) {
+        // TODO Auto-generated method stub
+        System.out.println("用户ID====>" + userId);
+
+        UserAddress address1 = new UserAddress(1, "北京市昌平区宏福科技园综合楼3层", "1", "李老师", "010-56253825", "Y");
+        UserAddress address2 = new UserAddress(2, "深圳市宝安区西部硅谷大厦B座3层（深圳分校）", "1", "王老师", "010-56253825", "N");
+
+        return Arrays.asList(address1, address2);
+    }
+}
+@Service
+public class OrderServiceImpl implements OrderService {
+
+    @Reference //远程调用
+    UserService userService;
+
+    @Override
+    public List<UserAddress> initOrder(String userId) {
+
+        // TODO Auto-generated method stub
+        //1、查询用户的收货地址
+        List<UserAddress> addressList = userService.getUserAddressList(userId);
+        /*for (UserAddress userAddress : addressList) {
+            System.out.println(userAddress);
+        }
+        System.out.println(addressList);*/
+        return addressList;
+    }
+}
+/**
+ *  1、导入dubbo-starter
+ *  2、导入dubbo的其他依赖
+ *  3、配置dubbo
+ */
+@EnableDubbo //开启基于注解的dubbo功能
+@SpringBootApplication
+public class MainApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(MainApplication.class, args);
+    }
+}
+```
+
+
+
+## 7、dubbo配置

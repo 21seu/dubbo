@@ -18,7 +18,7 @@ import java.util.List;
 @Service
 public class OrderServiceImpl implements OrderService {
 
-    @Reference
+    @Reference //远程调用
     UserService userService;
 
     @Override

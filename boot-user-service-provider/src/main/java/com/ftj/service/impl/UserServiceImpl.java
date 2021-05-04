@@ -2,14 +2,13 @@ package com.ftj.service.impl;
 
 import com.ftj.bean.UserAddress;
 import com.ftj.service.UserService;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-import javax.xml.ws.soap.Addressing;
 import java.util.Arrays;
 import java.util.List;
 
 @com.alibaba.dubbo.config.annotation.Service //暴露服务
-@Service
+@Component
 public class UserServiceImpl implements UserService {
 
     @Override
