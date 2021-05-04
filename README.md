@@ -245,7 +245,7 @@ clientPort=2181  zookeeper的端口号
 
 1、gmall-interface公共模块：公共接口层（bean、service）
 
-```
+```java
 package com.ftj.bean;
 
 import java.io.Serializable;
@@ -317,12 +317,9 @@ public class UserAddress implements Serializable {
         this.isDefault = isDefault;
     }
 }
-package com.ftj.service;
+```
 
-import com.ftj.bean.UserAddress;
-
-import java.util.List;
-
+```java
 public interface OrderService {
     
     /**
@@ -332,12 +329,9 @@ public interface OrderService {
     public List<UserAddress> initOrder(String userId);
 
 }
-package com.ftj.service;
+```
 
-import com.ftj.bean.UserAddress;
-
-import java.util.List;
-
+```java
 /**
  * 用户服务
  * @author lfy
@@ -355,11 +349,9 @@ public interface UserService {
 }
 ```
 
-
-
 2、创建服务提供者user-service-provider模块，对用户接口的实现；且首先需要在 `pom.xml` 引入gmall-interface模块。
 
-```
+```java
 <dependency>
   <groupId>com.ftj.gmall</groupId>
   <artifactId>gmall-interface</artifactId>
@@ -379,7 +371,7 @@ public class UserServiceImpl implements UserService {
 
 3、创建服务消费者order-service-consumer模块，同样首先需要在 `pom.xml` 引入gmall-interface模块。
 
-```
+```java
 <dependency>
   <groupId>com.ftj.gmall</groupId>
   <artifactId>gmall-interface</artifactId>
@@ -403,7 +395,7 @@ public class OrderService {
 
 4、使用dubbo改造上述两个模块，首先引入dubbo和zookeeper相关的依赖。
 
-```
+```xml
         <!-- 引入dubbo -->
         <dependency>
             <groupId>com.alibaba</groupId>
@@ -432,7 +424,7 @@ public class OrderService {
 
 5、配置服务提供方`provider.xml`
 
-```
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -463,7 +455,7 @@ public class OrderService {
 
 6、配置服务消费者的`consumer.xml`
 
-```
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -499,7 +491,7 @@ public class OrderService {
 
 7、分别启动服务提供方和服务消费者
 
-```
+```java
 public class MainApplication {
     //服务提供者
     public static void main(String[] args) throws IOException {
@@ -557,7 +549,7 @@ public class MainApplication {
 
 在需要监控服务中配置连接监控中心，进行监控统计。
 
-```
+```xml
 <!-- 监控中心协议，如果为protocol="registry"，
 表示从注册中心发现监控中心地址，否则直连监控中心 -->
 <dubbo:monitor protocol="registry"></dubbo:monitor>
@@ -575,7 +567,7 @@ Simple Monitor 采用磁盘存储统计信息，请注意安装机器的磁盘�
 
 1. 引入spring-boot-starter以及dubbo和curator依赖。
 
-```
+```xml
 <dependency>
   <groupId>com.alibaba.boot</groupId>
   <artifactId>dubbo-spring-boot-starter</artifactId>
@@ -585,7 +577,7 @@ Simple Monitor 采用磁盘存储统计信息，请注意安装机器的磁盘�
 
 1. 分别配置好服务提供者和服务消费者两个模块的`application.properties`。
 
-```
+```yaml
 dubbo.application.name=user-service-provider
 #指定注册中心的位置
 dubbo.registry.address=127.0.0.1:2181
@@ -613,7 +605,7 @@ server.port=8045
   - @Reference注解：服务消费方，使用这个注解实现远程调用
   - @@EnableDubbo注解：如果`application.properties`配置文件中没有配置自动扫描注解`dubbo.scan.base-package`，那么可以使用这个注解自动扫描被dubbo注解的类或接口。
 
-```
+```java
 @com.alibaba.dubbo.config.annotation.Service //暴露服务
 @Component
 public class UserServiceImpl implements UserService {
@@ -629,6 +621,9 @@ public class UserServiceImpl implements UserService {
         return Arrays.asList(address1, address2);
     }
 }
+```
+
+```java
 @Service
 public class OrderServiceImpl implements OrderService {
 
@@ -648,6 +643,9 @@ public class OrderServiceImpl implements OrderService {
         return addressList;
     }
 }
+```
+
+```java
 /**
  *  1、导入dubbo-starter
  *  2、导入dubbo的其他依赖
@@ -662,6 +660,8 @@ public class MainApplication {
     }
 }
 ```
+
+
 
 
 
