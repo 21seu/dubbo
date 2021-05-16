@@ -13,7 +13,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserAddress> getUserAddressList(String userId) {
-        System.out.println("getUserAddressList...old...");
         // TODO Auto-generated method stub
         System.out.println("用户ID====>" + userId);
 

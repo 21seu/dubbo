@@ -18,7 +18,7 @@ import java.util.List;
 @Service
 public class OrderServiceImpl implements OrderService {
 
-    @Reference //远程调用
+    @Reference(url = "127.0.0.1:20880") //远程调用 如果配置url属性那么是直接绕过注册中心
     UserService userService;
 
     @Override
