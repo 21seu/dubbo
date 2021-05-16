@@ -8,21 +8,29 @@
        http://dubbo.apache.org/schema/dubbo/dubbo.xsd">
 
     <!-- 指定当前服务/应用的名字（同样的服务名字相同，不要和别的服务同名） -->
-    <dubbo:application name="user-service-provider"  />
+    <dubbo:application name="user-service-provider"/>
 
     <!-- 指定注册中心的位置    使用multicast广播注册中心暴露服务地址   -->
     <!--<dubbo:registry address="multicast://224.5.6.7:1234" />-->
     <dubbo:registry address="zookeeper://127.0.0.1:2181"/>
 
     <!-- 指定通信规则（协议+端口）  用dubbo协议在20880端口暴露服务 -->
-    <dubbo:protocol name="dubbo" port="20880" />
+    <dubbo:protocol name="dubbo" port="20880"/>
 
     <!-- 声明需要暴露的服务接口 -->
-    <dubbo:service interface="com.ftj.service.UserService" ref="userServiceImpl" />
+    <dubbo:service interface="com.ftj.service.UserService"
+                   ref="userServiceImpl01" version="1.0.0">
+        <dubbo:method name="getUserAddressList" timeout="1000"></dubbo:method>
+    </dubbo:service>
+
+    <dubbo:service interface="com.ftj.service.UserService"
+                   ref="userServiceImpl02" version="2.0.0">
+        <dubbo:method name="getUserAddressList" timeout="1000"></dubbo:method>
+    </dubbo:service>
 
     <!--服务的实现-->
-    <bean id="userServiceImpl" class="com.ftj.service.impl.UserServiceImpl"/>
-
+    <bean id="userServiceImpl01" class="com.ftj.service.impl.UserServiceImpl"/>
+    <bean id="userServiceImpl02" class="com.ftj.service.impl.UserServiceImpl2"/>
     <!-- 和本地bean一样实现服务 -->
 
     <!--连接监控中心-->

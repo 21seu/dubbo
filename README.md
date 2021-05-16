@@ -681,6 +681,138 @@ Properties 最后，相当于缺省值，只有 XML 没有配置时，dubbo.prop
 
 ### 7.2 重试次数
 
+失败自动切换，当出现失败，重试其它服务器，但重试会带来更长延迟。可通过 retries="2" 来设置重试次数(不含第一次)。
+
+```xml
+<!--重试次数配置如下：-->
+<dubbo:service retries="2" />
+<!--或-->
+<dubbo:reference retries="2" />
+<!--或-->
+<dubbo:reference>
+    <dubbo:method name="findFoo" retries="2" />
+</dubbo:reference>
+```
+
+
+
 ### 7.3 超时时间
 
 由于网络或服务端不可靠，会导致调用出现一种不确定的中间状态（超时）。为了避免超时导致客户端资源（线程）挂起耗尽，必须设置超时时间。
+
+
+
+#### 7.3.1 dubbo消费端
+
+```xml
+全局超时配置
+<dubbo:consumer timeout="5000" />
+
+指定接口以及特定方法超时配置
+<dubbo:reference interface="com.foo.BarService" timeout="2000">
+    <dubbo:method name="sayHello" timeout="3000" />
+</dubbo:reference>
+```
+
+#### 7.3.2 dubbo服务端
+
+```xml
+全局超时配置
+<dubbo:provider timeout="5000" />
+
+指定接口以及特定方法超时配置
+<dubbo:provider interface="com.foo.BarService" timeout="2000">
+    <dubbo:method name="sayHello" timeout="3000" />
+</dubbo:provider>
+```
+
+#### 7.3.3 dubbo配置原则
+
+dubbo推荐在Provider上尽量多配置Consumer端属性：
+
+```markdown
+1、作服务的提供者，比服务使用方更清楚服务性能参数，如调用的超时时间，合理的重试次数，等等
+2、在Provider配置后，Consumer不配置则会使用Provider的配置值，即Provider配置可以作为Consumer的缺省值。否则，Consumer会使用Consumer端的全局设置，这对于Provider不可控的，并且往往是不合理的
+```
+
+配置的覆盖规则：
+
+1. 方法级配置别优于接口级别，即小Scope优先 
+2. Consumer端配置 优于 Provider配置 优于 全局配置
+3. 最后是Dubbo Hard Code的配置值（见配置文档）
+
+
+
+![image.png](https://cdn.nlark.com/yuque/0/2021/png/12759906/1621158271551-8da31fea-d227-433d-8075-4568872eef92.png)
+
+
+
+### 7.4 多版本
+
+当一个接口实现，出现不兼容升级时，可以用版本号过渡，版本号不同的服务相互间不引用。
+
+可以按照以下的步骤进行版本迁移：
+
+- 在低压力时间段，先升级一半提供者为新版本
+- 再将所有消费者升级为新版本
+- 然后将剩下的一半提供者升级为新版本
+
+```xml
+老版本服务提供者配置：
+<dubbo:service interface="com.foo.BarService" version="1.0.0" />
+
+新版本服务提供者配置：
+<dubbo:service interface="com.foo.BarService" version="2.0.0" />
+
+老版本服务消费者配置：
+<dubbo:reference id="barService" interface="com.foo.BarService" version="1.0.0" />
+
+新版本服务消费者配置：
+<dubbo:reference id="barService" interface="com.foo.BarService" version="2.0.0" />
+
+如果不需要区分版本，可以按照以下的方式配置：
+<dubbo:reference id="barService" interface="com.foo.BarService" version="*" />
+```
+
+
+
+### 7.5 本地存根
+
+远程服务后，客户端通常只剩下接口，而实现全在服务器端，但提供方有些时候想在客户端也执行部分逻辑，比如：做 ThreadLocal 缓存，提前验证参数，调用失败后伪造容错数据等等，此时就需要在 API 中带上 Stub，客户端生成 Proxy 实例，会把 Proxy 通过构造函数传给 Stub（Stub 必须有可传入 Proxy 的构造函数。），然后把 Stub 暴露给用户，Stub 可以决定要不要去调 Proxy。
+
+![image](https://cdn.nlark.com/yuque/0/2021/jpeg/12759906/1621169311238-63cbf69a-e406-4648-9ddd-5db4fd5a9a2f.jpeg)
+
+
+
+创建一个本地存根（在 interface 旁边放一个 Stub 实现，它实现 BarService 接口，并有一个传入远程 BarService 实例的构造函数）
+
+```java
+package com.foo;
+public class BarServiceStub implements BarService {
+    private final BarService barService;
+    
+    // 构造函数传入真正的远程代理对象
+    public BarServiceStub(BarService barService){
+        this.barService = barService;
+    }
+ 
+    public String sayHello(String name) {
+        // 此代码在客户端执行, 你可以在客户端做ThreadLocal本地缓存，或预先验证参数是否合法，等等
+        try {
+            return barService.sayHello(name);
+        } catch (Exception e) {
+            // 你可以容错，可以做任何AOP拦截事项
+            return "容错数据";
+        }
+    }
+}
+```
+
+消费者端配置本地存根
+
+```xml
+<dubbo:service interface="com.foo.BarService" stub="true" />
+  或
+<dubbo:service interface="com.foo.BarService" stub="com.foo.BarServiceStub" />
+```
+
