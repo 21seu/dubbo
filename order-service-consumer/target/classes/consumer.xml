@@ -20,7 +20,7 @@
 
     <!-- 生成远程服务代理，可以和本地bean一样使用demoService check="false"-->
     <!--方法级优先级最高 精确优先，消费者设置优先（级别一样的情况下）-->
-    <dubbo:reference interface="com.ftj.service.UserService" id="userService">
+    <dubbo:reference interface="com.ftj.service.UserService" id="userService" timeout="5000">
         <dubbo:method name="getUserAddressList"></dubbo:method>
     </dubbo:reference>
 
