@@ -3,6 +3,7 @@ package com.ftj;
 import com.alibaba.dubbo.config.spring.context.annotation.EnableDubbo;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.hystrix.EnableHystrix;
 import org.springframework.context.annotation.ImportResource;
 
 /**
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.ImportResource;
 @EnableDubbo(scanBasePackages = "com.ftj") //开启基于注解的dubbo功能
 //@ImportResource(locations = classpath:xx)
 @SpringBootApplication
+@EnableHystrix //开启服务容错
 public class MainApplication {
 
     public static void main(String[] args) {

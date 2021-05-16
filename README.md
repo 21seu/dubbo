@@ -844,3 +844,259 @@ public class BarServiceStub implements BarService {
 
 
 ### 8.2 集群下dubbo负载均衡配置
+
+> 负载均衡改善了跨多个计算资源（例如计算机，计算机集群，网络链接，中央处理单元或磁盘驱动）的工作负载分布。负载平衡旨在优化资源使用，最大化吞吐量，最小化响应时间，并避免任何单个资源的过载。使用具有负载平衡而不是单个组件的多个组件可以通过冗余提高可靠性和可用性。负载平衡通常涉及专用软件或硬件。
+
+**上面讲的大家可能不太好理解，再用通俗的话给大家说一下。**
+
+我们的系统中的某个服务的访问量特别大，我们将这个服务部署在了多台服务器上，当客户端发起请求的时候，多台服务器都可以处理这个请求。那么，如何正确选择处理该请求的服务器就很关键。假如，你就要一台服务器来处理该服务的请求，那该服务部署在多台服务器的意义就不复存在了。负载均衡就是为了避免单个服务器响应同一请求，容易造成服务器宕机、崩溃等问题，我们从负载均衡的这四个字就能明显感受到它的意义。
+
+
+
+```markdown
+Random LoadBalance
+随机，按权重设置随机概率。
+在一个截面上碰撞的概率高，但调用量越大分布越均匀，而且按概率使用权重后也比较均匀，有利于动态调整提供者权重。
+
+RoundRobin LoadBalance
+轮循，按公约后的权重设置轮循比率。
+存在慢的提供者累积请求的问题，比如：第二台机器很慢，但没挂，当请求调到第二台时就卡在那，久而久之，所有请求都卡在调到第二台上。
+
+LeastActive LoadBalance
+最少活跃调用数，相同活跃数的随机，活跃数指调用前后计数差。
+使慢的提供者收到更少请求，因为越慢的提供者的调用前后计数差会越大。
+
+ConsistentHash LoadBalance
+一致性 Hash，相同参数的请求总是发到同一提供者。
+当某一台提供者挂时，原本发往该提供者的请求，基于虚拟节点，平摊到其它提供者，不会引起剧烈变动。算法参见：http://en.wikipedia.org/wiki/Consistent_hashing
+缺省只对第一个参数 Hash，如果要修改，请配置 <dubbo:parameter key="hash.arguments" value="0,1" />
+缺省用 160 份虚拟节点，如果要修改，请配置 <dubbo:parameter key="hash.nodes" value="320" />
+```
+
+
+
+在集群负载均衡时，Dubbo 提供了多种均衡策略，默认为 `random` 随机调用。我们还可以自行扩展负载均衡策略（参考Dubbo SPI机制）。
+
+在 Dubbo 中，所有负载均衡实现类均继承自 `AbstractLoadBalance`，该类实现了`LoadBalance` 接口，并封装了一些公共的逻辑。
+
+
+
+```java
+public abstract class AbstractLoadBalance implements LoadBalance {
+
+    static int calculateWarmupWeight(int uptime, int warmup, int weight) {
+    }
+
+    @Override
+    public <T> Invoker<T> select(List<Invoker<T>> invokers, URL url, Invocation invocation) {
+    }
+
+    protected abstract <T> Invoker<T> doSelect(List<Invoker<T>> invokers, URL url, Invocation invocation);
+
+
+    int getWeight(Invoker<?> invoker, Invocation invocation) {
+
+    }
+}
+```
+
+`AbstractLoadBalance` 的实现类有下面这些：
+
+![image.png](https://cdn.nlark.com/yuque/0/2021/png/12759906/1621176285347-e12a88ab-44ce-41a9-bb7b-5b39cdf6461c.png)
+
+官方文档对负载均衡这部分的介绍非常详细，地址：https://dubbo.apache.org/zh/docs/v2.7/dev/source/loadbalance/#m-zhdocsv27devsourceloadbalance 。
+
+
+
+### 8.3 整合hystrix，服务熔断与降级处理
+
+#### 8.3.1 服务降级
+
+> **当服务器压力剧增的情况下，根据实际业务情况及流量，对一些服务和页面有策略的不处理或换种简单的方式处理，从而释放服务器资源以保证核心交易正常运作或高效运作。**
+
+可以通过服务降级功能临时屏蔽某个出错的非关键服务，并定义降级后的返回策略。
+
+
+
+向注册中心写入动态配置覆盖规则：
+
+```java
+RegistryFactory registryFactory = ExtensionLoader.getExtensionLoader(RegistryFactory.class).getAdaptiveExtension();
+Registry registry = registryFactory.getRegistry(URL.valueOf("zookeeper://10.20.153.10:2181"));
+registry.register(URL.valueOf("override://0.0.0.0/com.foo.BarService?category=configurators&dynamic=false&application=foo&mock=force:return+null"));
+```
+
+其中：
+
+- mock=force:return+null表示消费方对该服务的方法调用都直接返回 null 值，不发起远程调用。用来屏蔽不重要服务不可用时对调用方的影响。
+- 还可以改为mock=fail:return+null 表示消费方对该服务的方法调用在失败后，再返回 null 值，不抛异常。用来容忍不重要服务不稳定时对调用方的影响。
+
+
+
+#### 8.3.2 集群容错
+
+> **在集群调用失败时，Dubbo 提供了多种容错方案，缺省为 failover 重试。**
+
+
+
+集群容错模式：
+
+**Failover Cluster**
+
+失败自动切换，当出现失败，重试其它服务器。通常用于读操作，但重试会带来更长延迟。可通过retries="2" 来设置重试次数(不含第一次)。
+
+重试次数配置如下：
+
+```xml
+<dubbo:service retries="2" />
+```
+
+或
+
+```xml
+<dubbo:reference retries="2" />
+```
+
+或
+
+```xml
+<dubbo:reference>
+  <dubbo:method name="findFoo" retries="2" />
+</dubbo:reference>
+```
+
+ 
+
+**Failfast Cluster**
+
+快速失败，只发起一次调用，失败立即报错。通常用于非幂等性的写操作，比如新增记录。
+
+ 
+
+**Failsafe Cluster**
+
+失败安全，出现异常时，直接忽略。通常用于写入审计日志等操作。
+
+ 
+
+**Failback Cluster**
+
+失败自动恢复，后台记录失败请求，定时重发。通常用于消息通知操作。
+
+ 
+
+**Forking Cluster**
+
+并行调用多个服务器，只要一个成功即返回。通常用于实时性要求较高的读操作，但需要浪费更多服务资源。可通过forks="2" 来设置最大并行数。
+
+ 
+
+**Broadcast Cluster**
+
+广播调用所有提供者，逐个调用，任意一台报错则报错。通常用于通知所有提供者更新缓存或日志等本地资源信息。
+
+ 
+
+**集群模式配置**
+
+按照以下示例在服务提供方和消费方配置集群模式
+
+```
+<dubbo:service cluster="failsafe" />
+```
+
+或
+
+```
+<dubbo:reference cluster="failsafe" />
+```
+
+
+
+#### 8.3.3 整合hystrix
+
+> **Hystrix旨在通过控制那些访问远程系统、服务和第三方库的节点，从而对延迟和故障提供更强大的容错能力。Hystrix具备拥有回退机制和断路器功能的线程和信号隔离，请求缓存和请求打包，以及监控和配置等功能**
+
+
+
+1. 配置spring-cloud-starter-netflix-hystrix
+
+spring boot官方提供了对hystrix的集成，直接在pom.xml里加入依赖：
+
+```xml
+<dependency>
+   <groupId>org.springframework.cloud</groupId>
+   <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+   <version>2.0.2.RELEASE</version>
+</dependency>
+```
+
+然后在Application类上增加@EnableHystrix来启用hystrix starter：
+
+```java
+@SpringBootApplication
+@EnableHystrix
+public class ProviderApplication {}
+```
+
+1. 配置Provider端
+
+在Dubbo的Provider上增加@HystrixCommand配置，这样子调用就会经过Hystrix代理。
+
+```java
+@com.alibaba.dubbo.config.annotation.Service //暴露服务
+@Component
+public class UserServiceImpl implements UserService {
+
+    @HystrixCommand //
+    @Override
+    public List<UserAddress> getUserAddressList(String userId) {
+        // TODO Auto-generated method stub
+        System.out.println("用户ID====>" + userId);
+
+        UserAddress address1 = new UserAddress(1, "北京市昌平区宏福科技园综合楼3层", "1", "李老师", "010-56253825", "Y");
+        UserAddress address2 = new UserAddress(2, "深圳市宝安区西部硅谷大厦B座3层（深圳分校）", "1", "王老师", "010-56253825", "N");
+
+        if (Math.random() > 0.5) {
+            throw new RuntimeException();
+        }
+        return Arrays.asList(address1, address2);
+    }
+}
+```
+
+1. 配置Consumer端
+
+对于Consumer端，则可以增加一层method调用，并在method上配置@HystrixCommand。当调用出错时，会走到fallbackMethod = "hello"的调用里。
+
+```java
+@Service
+public class OrderServiceImpl implements OrderService {
+
+    @Reference(url = "127.0.0.1:20880", loadbalance = "random", timeout = 1000) //远程调用 如果配置url属性那么是直接绕过注册中心
+            UserService userService;
+
+    @HystrixCommand(fallbackMethod = "hello")
+    @Override
+    public List<UserAddress> initOrder(String userId) {
+
+        // TODO Auto-generated method stub
+        //1、查询用户的收货地址
+        List<UserAddress> addressList = userService.getUserAddressList(userId);
+        /*for (UserAddress userAddress : addressList) {
+            System.out.println(userAddress);
+        }
+        System.out.println(addressList);*/
+        return addressList;
+    }
+
+    public List<UserAddress> hello(String userId) {
+
+        return Arrays.asList(new UserAddress(10, "测试地址", "1", "测试", "测试", "Y"));
+    }
+}
+```
+
+1. 如果产生运行时异常，则调用hello方法
+
+![image.png](https://cdn.nlark.com/yuque/0/2021/png/12759906/1621179004676-ee258789-6285-447f-8626-87b8bc78dce9.png)
